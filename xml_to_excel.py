@@ -1,36 +1,93 @@
 import xmltodict
 import pandas as pd
 import os
-import json
 
-def xml_to_excel(arquivo_nome, valores):
-    
+
+def processar_xml(arquivo_nome):
     with open(f'xml/{arquivo_nome}', 'rb') as arquivo_xml:
         json_arquivo = xmltodict.parse(arquivo_xml)
-        # Convert the ordered dictionary to a JSON string
-        json_string = json.dumps(json_arquivo, indent=4)
-        #print(json_string)
+        infor_nfe = (
+            json_arquivo.get('nfeProc', {}).get('NFe', {}).get('infNFe')
+            or json_arquivo.get('NFe', {}).get('infNFe')
+        )
 
-        infor_nfe = json_arquivo['nfeProc']['NFe']['infNFe'] if 'nfeProc' in json_arquivo else json_arquivo['NFe']['infNFe']
-        dados_nfe = infor_nfe['@Id'] if '@Id' in infor_nfe else 'nao informado'
-        dados_emitente = infor_nfe['emit']['xNome'] if 'emit' in infor_nfe else 'nao informado'  
-        dados_destinatario = infor_nfe['dest']['xNome'] if 'dest' in infor_nfe else 'nao informado'
-        dados_produtos = infor_nfe['det']['prod']['xProd'] if 'det' in infor_nfe else 'nao informado'
-        dados_totais = infor_nfe['det']['prod']['vProd']if 'det' in infor_nfe and 'ICMSTot' in infor_nfe['total'] else 'nao informado'
-        dados_transporte = infor_nfe['pag']['detPag']['vPag'] if 'pag' in infor_nfe else 'nao informado'
-        valores.append([dados_nfe, dados_emitente, dados_destinatario, dados_produtos, dados_totais, dados_transporte])
+        if not infor_nfe:
+            print(f"Arquivo inválido ou estrutura desconhecida: {arquivo_nome}")
+            return []
+
+        # Informações gerais
+        numero_nfe = infor_nfe.get('@Id', 'não informado')
+        emitente = infor_nfe.get('emit', {}).get('xNome', 'não informado')
+        destinatario = infor_nfe.get('dest', {}).get('xNome', 'não informado')
+
+        # Total da nota
+        total_nfe = (
+            infor_nfe.get("total", {})
+                     .get("ICMSTot", {})
+                     .get("vNF", "não informado")
+        )
+
+        # Valor pago
+        valor_pago = (
+            infor_nfe.get("pag", {})
+                     .get("detPag", {})
+                     .get("vPag", "não informado")
+        )
+
+        # Produtos
+        produtos = infor_nfe.get("det", [])
+
+        # Normaliza caso tenha apenas um produto (algumas notas são assim)
+        if isinstance(produtos, dict):
+            produtos = [produtos]
+
+        linhas = []
+
+        for item in produtos:
+            prod = item.get("prod", {})
+
+            linhas.append({
+                "n°_nfe": numero_nfe,
+                "emitente": emitente,
+                "destinatario": destinatario,
+                "produto": prod.get("xProd", "não informado"),
+                "quantidade": prod.get("qCom", "não informado"),
+                "valor_unitario": prod.get("vUnCom", "não informado"),
+                "valor_total_item": prod.get("vProd", "não informado"),
+                "valor_total_nfe": total_nfe,
+                "valor_pago": valor_pago
+            })
+
+        return linhas
 
 
-    
-    
-arquivo  = os.listdir('xml')
-colunas = ['n°_nfe', 'emitente', 'destinatario', 'produtos', 'total_item', 'valor_total_nfe']
-valores = []
+def gerar_excel():
+    if not os.path.exists("xml"):
+        print("Erro: a pasta 'xml' não existe.")
+        return
 
-for file in arquivo:
-    arquivo_nome = file
-    xml_to_excel(arquivo_nome, valores)
+    arquivos = os.listdir("xml")
+    if not arquivos:
+        print("Nenhum XML encontrado na pasta 'xml'.")
+        return
+
+    tabela_final = []
+    for arquivo in arquivos:
+        if arquivo.lower().endswith(".xml"):
+            print(f"Processando {arquivo}...")
+            linhas = processar_xml(arquivo)
+            tabela_final.extend(linhas)
+
+    if not tabela_final:
+        print("Nenhum dado encontrado nos arquivos XML.")
+        return
+
+    df = pd.DataFrame(tabela_final)
+    df.to_excel("tabela_nfe.xlsx", index=False)
+
+    print("\nPlanilha gerada com sucesso!")
+    print("Arquivo criado: tabela_nfe.xlsx")
 
 
-tabela_excel = pd.DataFrame(valores, columns=colunas)
-tabela_excel.to_excel('tabela_nfe.xlsx', index=False)
+if __name__ == "__main__":
+    gerar_excel()
