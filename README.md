@@ -1,4 +1,8 @@
+
 # 📄 XMLtoExcel – Conversor de NF-e (XML) para Excel
+![imagem de xml para excel](./img/XMLto.png)
+
+---
 
 ## Visão Geral
 
@@ -26,25 +30,13 @@ Ideal para auditorias, conferências, controles internos e análises.
 
 ---
 
-## 🗂 Estrutura do Projeto
-
-```
-XMLtoExcel/
-│
-├── xml/ # Coloque aqui seus XMLs
-├── tabela_nfe.xlsx # Arquivo gerado
-├── requirements.txt # Dependências
-└── main.py # Script principal
-```
-
----
-
 ## 🛠 Tecnologias
 
 - Python 3.12+
 - xmltodict
 - pandas
 - openpyxl
+- streamlit
 
 ---
 
